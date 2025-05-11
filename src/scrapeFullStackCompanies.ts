@@ -3,8 +3,7 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import fs from "fs/promises";
 import * as cheerio from "cheerio";
 import { Page } from "puppeteer";
-import { Agency, AgencyDetails } from "@/common/interfaces/agency.interface";
-// import { Agency, AgencyDetails } from "@/common/interfaces/agency.interface";
+import { AgencyI, AgencyDetailsI } from "@/common/interfaces/agency.interface";
 
 /**
  * [+] Scrape list of agencies from the specialty page
@@ -12,7 +11,7 @@ import { Agency, AgencyDetails } from "@/common/interfaces/agency.interface";
 async function scrapeFromURL(
     page: Page,
     specialty: string = "full-stack-development"
-): Promise<Agency[]> {
+): Promise<AgencyI[]> {
     const url = `https://www.sortlist.com/s/${specialty}/morocco-ma`;
 
     console.log(`[+] Navigating to: ${url}`);
@@ -23,21 +22,21 @@ async function scrapeFromURL(
     const content = await page.content();
     const $ = cheerio.load(content);
 
-    const agencies: Agency[] = [];
+    const agencies: AgencyI[] = [];
 
     $("ul.grid-list li article").each((_, element) => {
-        const name = $(element).find("div.agency-name a").text().trim();
+        const name = $(element).find("div.AgencyI-name a").text().trim();
         const href =
             "https://www.sortlist.com" +
-            $(element).find("div.agency-name a").attr("href");
-        const description = $(element).find("div.agency-info p").text().trim();
+            $(element).find("div.AgencyI-name a").attr("href");
+        const description = $(element).find("div.AgencyI-info p").text().trim();
         const location = $(element)
-            .find(".agency-main-info .agency-info-cell")
+            .find(".AgencyI-main-info .AgencyI-info-cell")
             .eq(0)
             .text()
             .trim();
         const services = $(element)
-            .find(".agency-main-info .agency-info-cell")
+            .find(".AgencyI-main-info .AgencyI-info-cell")
             .eq(1)
             .text()
             .trim();
@@ -47,6 +46,130 @@ async function scrapeFromURL(
 
     console.log(`[+] Found ${agencies.length} agencies`);
     return agencies;
+}
+
+/**
+ * [+] Scrape the detailed information about an AgencyI
+ */
+async function scrapeAgencyDetails(page: Page): Promise<AgencyDetailsI> {
+    return await page.evaluate(() => {
+        const safeText = (selector: string) => {
+            const element = document.querySelector(selector);
+            return element ? element.textContent?.trim() || "" : "";
+        };
+
+        // [>] Expand description text
+        const span = document.querySelector('span[data-testid="clamp-lines"]');
+        if (span) {
+            span.className = "display-block"; // force class
+        }
+        const descriptionText = span?.textContent?.trim() || "";
+
+        // [>] Headquarters block
+        const headquartersBlock = Array.from(
+            document.querySelectorAll(
+                "div.small.layout-column.py-8.px-12.rounded-sm"
+            )
+        ).find((div) =>
+            div.querySelector("span.bold")?.textContent?.includes("Headquarter")
+        );
+
+        const fullHeadquarters = headquartersBlock
+            ? headquartersBlock
+                  .querySelector("span.text-break-word")
+                  ?.textContent?.trim() || ""
+            : "";
+
+        let headquartersCity: string | undefined = undefined;
+        if (fullHeadquarters) {
+            const parts = fullHeadquarters.split(",");
+            if (parts.length >= 2) {
+                headquartersCity = parts[parts.length - 2].trim();
+            }
+        }
+
+        // [>] Mobile, landline, website
+        const mobileMatch = descriptionText.match(/Mobile\s*:\s*(\+\d[\d\s]+)/);
+        const landlineMatch = descriptionText.match(/Fixe\s*:\s*(\+\d[\d\s]+)/);
+        const websiteMatch = descriptionText.match(
+            /Site\s*:\s*(https?:\/\/[^\s]+)/
+        );
+
+        // [>] Social media links
+        const socialLinks = Array.from(document.querySelectorAll("a"))
+            .map((a) => a.getAttribute("href") || "")
+            .filter(
+                (link) =>
+                    link.includes("linkedin.com") ||
+                    link.includes("facebook.com") ||
+                    link.includes("twitter.com") ||
+                    link.includes("instagram.com")
+            );
+
+        const linkedinProfile = socialLinks.find((link) =>
+            link.includes("linkedin.com")
+        );
+        const otherSocialLinks: { [platform: string]: string } = {};
+        for (const link of socialLinks) {
+            if (link.includes("facebook.com")) otherSocialLinks.facebook = link;
+            if (link.includes("twitter.com")) otherSocialLinks.twitter = link;
+            if (link.includes("instagram.com"))
+                otherSocialLinks.instagram = link;
+        }
+
+        // [>] Info fields
+        const infoItems = document.querySelectorAll(
+            "div.layout-row.layout-wrap.p-8 > div, div.layout-row.layout-wrap.p-8 > a"
+        );
+        const result: { [key: string]: string } = {};
+
+        infoItems.forEach((item: any) => {
+            const text = item.innerText.trim();
+
+            if (text.includes("people in their team")) {
+                result.employees = text;
+            } else if (text.includes("Speaks")) {
+                result.languages = text.replace("Speaks", "").trim();
+            } else if (text.includes("projects in their portfolio")) {
+                result.projects = text;
+            } else if (text.includes("Works remotely")) {
+                result.remoteWork = text;
+            } else if (text.includes("member since")) {
+                result.memberSince = text;
+            } else if (text.includes("Founded in")) {
+                result.founded = text;
+            } else if (text.includes("awards conferred")) {
+                result.awards = text;
+            }
+        });
+
+        return {
+            name: safeText("h1"),
+            location: safeText("h1 + div"),
+            description: descriptionText,
+            mobilePhone: mobileMatch ? mobileMatch[1] : undefined,
+            landlinePhone: landlineMatch ? landlineMatch[1] : undefined,
+            website: websiteMatch ? websiteMatch[1] : undefined,
+            employees: result.employees,
+            projects: result.projects,
+            remoteWork: result.remoteWork,
+            founded: result.founded,
+            memberSince: result.memberSince,
+            collaborations: undefined, // not available now
+            awards: result.awards,
+            languages: result.languages,
+            headquarters: fullHeadquarters,
+            headquartersCity,
+            linkedinProfile,
+            otherSocialLinks,
+            contactPage:
+                Array.from(document.querySelectorAll("a"))
+                    .find((a) =>
+                        a.textContent?.toLowerCase().includes("contact")
+                    )
+                    ?.getAttribute("href") || undefined,
+        };
+    });
 }
 
 /**
@@ -93,21 +216,23 @@ export async function sortListAgencies(specialties: string[]) {
             const agencies = await scrapeFromURL(page, specialty);
 
             if (agencies.length > 0) {
-                // Visit each agency href separately
-                for (const agency of agencies) {
+                // Visit each AgencyI href separately
+                for (const AgencyI of agencies) {
                     const agencyPage = await browser.newPage();
-                    console.log(`[+] Visiting agency: ${agency.name}`);
+                    console.log(`[+] Visiting AgencyI: ${AgencyI.name}`);
 
-                    await agencyPage.goto(agency.href, {
+                    await agencyPage.goto(AgencyI.href, {
                         waitUntil: "domcontentloaded",
                         timeout: 60000,
                     });
 
                     await skipCloudflare(agencyPage);
 
-                    const agencyDetails = await scrapeAgencyDetails(agencyPage);
-                    agency.agencyDetailes = agencyDetails;
-                    console.log(`[+] AGENCY Details extracted:`);
+                    const AgencyDetailsI = await scrapeAgencyDetails(
+                        agencyPage
+                    );
+                    AgencyI.agencyDetailes = AgencyDetailsI;
+                    console.log(`[+] AgencyI Details extracted:`);
 
                     await agencyPage.close();
                 }
@@ -159,118 +284,6 @@ async function skipCloudflare(page: Page) {
     }
 }
 
-/**
- * [+] Scrape the detailed information about an agency
- */
-async function scrapeAgencyDetails(page: Page): Promise<AgencyDetails> {
-  return await page.evaluate(() => {
-      const safeText = (selector: string) => {
-          const element = document.querySelector(selector);
-          return element ? element.textContent?.trim() || "" : "";
-      };
-
-      // [>] Expand description text
-      const span = document.querySelector('span[data-testid="clamp-lines"]');
-      if (span) {
-          span.className = "display-block"; // force class
-      }
-      const descriptionText = span?.textContent?.trim() || "";
-
-      // [>] Headquarters block
-      const headquartersBlock = Array.from(
-          document.querySelectorAll('div.small.layout-column.py-8.px-12.rounded-sm')
-      ).find(div => div.querySelector('span.bold')?.textContent?.includes('Headquarter'));
-
-      const fullHeadquarters = headquartersBlock
-          ? headquartersBlock.querySelector('span.text-break-word')?.textContent?.trim() || ""
-          : "";
-
-      let headquartersCity: string | undefined = undefined;
-      if (fullHeadquarters) {
-          const parts = fullHeadquarters.split(",");
-          if (parts.length >= 2) {
-              headquartersCity = parts[parts.length - 2].trim();
-          }
-      }
-
-      // [>] Mobile, landline, website
-      const mobileMatch = descriptionText.match(/Mobile\s*:\s*(\+\d[\d\s]+)/);
-      const landlineMatch = descriptionText.match(/Fixe\s*:\s*(\+\d[\d\s]+)/);
-      const websiteMatch = descriptionText.match(/Site\s*:\s*(https?:\/\/[^\s]+)/);
-
-      // [>] Social media links
-      const socialLinks = Array.from(document.querySelectorAll("a"))
-          .map((a) => a.getAttribute("href") || "")
-          .filter(link =>
-              link.includes("linkedin.com") ||
-              link.includes("facebook.com") ||
-              link.includes("twitter.com") ||
-              link.includes("instagram.com")
-          );
-
-      const linkedinProfile = socialLinks.find(link => link.includes("linkedin.com"));
-      const otherSocialLinks: { [platform: string]: string } = {};
-      for (const link of socialLinks) {
-          if (link.includes("facebook.com")) otherSocialLinks.facebook = link;
-          if (link.includes("twitter.com")) otherSocialLinks.twitter = link;
-          if (link.includes("instagram.com")) otherSocialLinks.instagram = link;
-      }
-
-      // [>] Info fields
-      const infoItems = document.querySelectorAll("div.layout-row.layout-wrap.p-8 > div, div.layout-row.layout-wrap.p-8 > a");
-      const result: { [key: string]: string } = {};
-
-      infoItems.forEach((item: any) => {
-          const text = item.innerText.trim();
-
-          if (text.includes("people in their team")) {
-              result.employees = text;
-          } else if (text.includes("Speaks")) {
-              result.languages = text.replace("Speaks", "").trim();
-          } else if (text.includes("projects in their portfolio")) {
-              result.projects = text;
-          } else if (text.includes("Works remotely")) {
-              result.remoteWork = text;
-          } else if (text.includes("member since")) {
-              result.memberSince = text;
-          } else if (text.includes("Founded in")) {
-              result.founded = text;
-          } else if (text.includes("awards conferred")) {
-              result.awards = text;
-          }
-      });
-
-      return {
-          name: safeText("h1"),
-          location: safeText("h1 + div"),
-          description: descriptionText,
-          mobilePhone: mobileMatch ? mobileMatch[1] : undefined,
-          landlinePhone: landlineMatch ? landlineMatch[1] : undefined,
-          website: websiteMatch ? websiteMatch[1] : undefined,
-          employees: result.employees,
-          projects: result.projects,
-          remoteWork: result.remoteWork,
-          founded: result.founded,
-          memberSince: result.memberSince,
-          collaborations: undefined, // not available now
-          awards: result.awards,
-          languages: result.languages,
-          headquarters: fullHeadquarters,
-          headquartersCity,
-          linkedinProfile,
-          otherSocialLinks,
-          contactPage:
-              Array.from(document.querySelectorAll("a"))
-                  .find((a) =>
-                      a.textContent?.toLowerCase().includes("contact")
-                  )
-                  ?.getAttribute("href") || undefined,
-      };
-  });
-}
-
-
-
 export async function test() {
     // Call the function to sort the list of agencies
     // await sortListAgencies(specialtys);
@@ -308,7 +321,7 @@ export async function test() {
 
     try {
         const page = await browser.newPage();
-        await page.goto("https://www.sortlist.com/agency/digitransform", {
+        await page.goto("https://www.sortlist.com/AgencyI/digitransform", {
             waitUntil: "networkidle2",
             timeout: 60000,
         });
