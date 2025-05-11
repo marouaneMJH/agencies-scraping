@@ -8,40 +8,49 @@ This project scrapes job posting websites in Morocco for full-stack developer po
 
 ## Features
 
-- Scrapes multiple job portals in Morocco
-- Collects full-stack developer job listings
-- Extracts detailed job information
-- Filters results based on criteria like experience level, skills, etc.
-- Exports data to JSON, CSV, or Excel format
-- Avoids duplicate listings
+-   Scrapes multiple job portals in Morocco
+-   Collects full-stack developer job listings
+-   Extracts detailed job information
+-   Filters results based on criteria like experience level, skills, etc.
+-   Exports data to JSON, CSV, or Excel format
+-   Avoids duplicate listings
 
 ## Technologies Used
 
-- Node.js
-- Puppeteer/Cheerio for web scraping
-- Express.js (if API endpoints are included)
-- MongoDB/SQLite (for data storage)
+-   Node.js
+-   Puppeteer/Cheerio for web scraping
+-   Express.js (if API endpoints are included)
+-   MongoDB/SQLite (for data storage)
 
 ## Installation
 
 1. Clone this repository:
+
     ```
     git clone https://github.com/marouaneMJH/scraper-fullstack-morocco.git
     cd scraper-fullstack-morocco
     ```
 
 2. Install dependencies:
+
     ```
     npm install
     ```
 
-3. Configure environment variables by creating a `.env` file based on `.env.example`
+3. Create necessary data directories:
+
+    ```
+    mkdir -p src/data src/data/sort-list
+    ```
+
+4. Configure environment variables by creating a `.env` file based on `.env.example`
 
 ## Usage
 
 ### Running the Scraper
 
 To start scraping job listings, run:
+
 ```
     npm run start
 ```

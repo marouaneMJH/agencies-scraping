@@ -37,7 +37,6 @@ wheels/
 # Scraped data and caches
 data/
 *.csv
-*.json
 *.xml
 *.html
 .scrapy/
@@ -82,3 +81,4 @@ yarn-error.log*
 .Trashes
 ehthumbs.db
 Thumbs.db
+
