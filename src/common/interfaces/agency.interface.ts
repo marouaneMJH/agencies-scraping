@@ -1,13 +1,13 @@
-export interface Agency {
+export interface AgencyI {
     name: string;
     href: string;
     description: string;
     location: string;
     services: string;
-    agencyDetailes?: AgencyDetails;
+    agencyDetailes?: AgencyDetailsI;
 }
 
-export interface AgencyDetails {
+export interface AgencyDetailsI {
     name: string;
     location: string;
     description: string;
@@ -32,4 +32,3 @@ export interface AgencyDetails {
     };
     contactPage?: string;
 }
-  

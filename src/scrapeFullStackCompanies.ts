@@ -28,15 +28,15 @@ async function scrapeFromURL(
         const name = $(element).find("div.AgencyI-name a").text().trim();
         const href =
             "https://www.sortlist.com" +
-            $(element).find("div.AgencyI-name a").attr("href");
+            $(element).find("div.agency-name a").attr("href");
         const description = $(element).find("div.AgencyI-info p").text().trim();
         const location = $(element)
-            .find(".AgencyI-main-info .AgencyI-info-cell")
+            .find(".AgencyI-main-info .agency-info-cell")
             .eq(0)
             .text()
             .trim();
         const services = $(element)
-            .find(".AgencyI-main-info .AgencyI-info-cell")
+            .find(".agency-main-info .agency-info-cell")
             .eq(1)
             .text()
             .trim();
@@ -49,7 +49,7 @@ async function scrapeFromURL(
 }
 
 /**
- * [+] Scrape the detailed information about an AgencyI
+ * [+] Scrape the detailed information about an agency
  */
 async function scrapeAgencyDetails(page: Page): Promise<AgencyDetailsI> {
     return await page.evaluate(() => {
@@ -216,12 +216,12 @@ export async function sortListAgencies(specialties: string[]) {
             const agencies = await scrapeFromURL(page, specialty);
 
             if (agencies.length > 0) {
-                // Visit each AgencyI href separately
-                for (const AgencyI of agencies) {
+                // Visit each agency href separately
+                for (const agency of agencies) {
                     const agencyPage = await browser.newPage();
-                    console.log(`[+] Visiting AgencyI: ${AgencyI.name}`);
+                    console.log(`[+] Visiting agency: ${agency.name}`);
 
-                    await agencyPage.goto(AgencyI.href, {
+                    await agencyPage.goto(agency.href, {
                         waitUntil: "domcontentloaded",
                         timeout: 60000,
                     });
@@ -231,8 +231,8 @@ export async function sortListAgencies(specialties: string[]) {
                     const AgencyDetailsI = await scrapeAgencyDetails(
                         agencyPage
                     );
-                    AgencyI.agencyDetailes = AgencyDetailsI;
-                    console.log(`[+] AgencyI Details extracted:`);
+                    agency.agencyDetailes = AgencyDetailsI;
+                    console.log(`[+] agency Details extracted:`);
 
                     await agencyPage.close();
                 }
@@ -321,7 +321,7 @@ export async function test() {
 
     try {
         const page = await browser.newPage();
-        await page.goto("https://www.sortlist.com/AgencyI/digitransform", {
+        await page.goto("https://www.sortlist.com/agency/digitransform", {
             waitUntil: "networkidle2",
             timeout: 60000,
         });
