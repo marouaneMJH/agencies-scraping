@@ -27,7 +27,7 @@ This project scrapes job posting websites in Morocco for full-stack developer po
 1. Clone this repository:
 
     ```
-    git clone https://github.com/marouaneMJH/scraper-fullstack-morocco.git
+    git clone https://github.com/marouaneMJH/agencies-scraping
     cd scraper-fullstack-morocco
     ```
 
